@@ -11,5 +11,6 @@ kiosk-frontend/dist/
 backend/.m2/
 backend/target/
 backend/*.log
+out/
 
 *.iml
