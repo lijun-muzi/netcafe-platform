@@ -1,0 +1,15 @@
+.DS_Store
+.idea/
+memory/
+
+admin-frontend/node_modules/
+admin-frontend/dist/
+
+kiosk-frontend/node_modules/
+kiosk-frontend/dist/
+
+backend/.m2/
+backend/target/
+backend/*.log
+
+*.iml

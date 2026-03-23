@@ -1,0 +1,42 @@
+server:
+  # 服务端口（本地开发默认 8080）
+  port: 8080
+
+spring:
+  application:
+    # 应用名称（用于日志与监控标识）
+    name: netcafe-backend
+  devtools:
+    restart:
+      # 开启热部署（修改代码后自动重启）
+      enabled: true
+  datasource:
+    # 数据库连接 URL（MySQL 8.x，时区上海，UTF-8）
+    url: jdbc:mysql://localhost:3306/netcafe-platform?useSSL=false&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    # 数据库用户名（可通过环境变量覆盖）
+    username: ${NETCAFE_DB_USERNAME:root}
+    # 数据库密码（必须通过环境变量提供，避免明文入库）
+    password: ${NETCAFE_DB_PASSWORD:}
+    # JDBC 驱动类
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis-plus:
+  configuration:
+    # 下划线字段自动映射为驼峰（如 created_at -> createdAt）
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      # 主键自增策略
+      id-type: auto
+
+app:
+  jwt:
+    # JWT 签名密钥（生产环境必须通过环境变量提供）
+    secret: ${NETCAFE_JWT_SECRET:netcafe-local-dev-secret-change-me}
+    # Token 有效期（秒）
+    expires-in: 7200
+  login:
+    # 登录失败最大次数（超过后锁定）
+    max-failures: 5
+    # 登录失败锁定时长（分钟）
+    lock-minutes: 3
