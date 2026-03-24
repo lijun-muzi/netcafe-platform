@@ -39,6 +39,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/auth/**", "/actuator/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/sessions/user-end").hasRole("USER")
+            .requestMatchers(HttpMethod.PUT, "/machines/*/price").hasRole("SUPER_ADMIN")
             .requestMatchers("/admins/**").hasRole("SUPER_ADMIN")
             .requestMatchers("/stats/**").hasRole("SUPER_ADMIN")
             .requestMatchers("/audit/**").hasRole("SUPER_ADMIN")

@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS `user` (
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY `uk_user_mobile` (`mobile`),
   UNIQUE KEY `uk_user_id_card` (`id_card`),
-  KEY `idx_user_status` (`status`)
+  KEY `idx_user_status` (`status`),
+  KEY `idx_user_name_status` (`name`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `admin` (
@@ -26,7 +27,9 @@ CREATE TABLE IF NOT EXISTS `admin` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY `uk_admin_username` (`username`),
-  KEY `idx_admin_status` (`status`)
+  KEY `idx_admin_status` (`status`),
+  KEY `idx_admin_role_status` (`role`, `status`),
+  KEY `idx_admin_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `machine` (
@@ -40,7 +43,8 @@ CREATE TABLE IF NOT EXISTS `machine` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY `uk_machine_code` (`code`),
-  KEY `idx_machine_status` (`status`)
+  KEY `idx_machine_status` (`status`),
+  KEY `idx_machine_price` (`price_per_min`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `machine_template` (
@@ -68,6 +72,7 @@ CREATE TABLE IF NOT EXISTS `session_order` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY `idx_session_status` (`status`),
+  KEY `idx_session_start_time` (`start_time`),
   KEY `idx_session_user_start` (`user_id`, `start_time`),
   KEY `idx_session_machine_start` (`machine_id`, `start_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

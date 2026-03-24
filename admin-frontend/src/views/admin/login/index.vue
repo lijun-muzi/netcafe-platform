@@ -133,6 +133,14 @@ const showPassword = ref(false)
 
 const apiBase = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
 const loginUrl = `${apiBase}/auth/login`
+const dashboardPath = '/admin/dashboard'
+
+const resolveRedirectPath = (redirect?: string) => {
+  if (!redirect || redirect === '/' || redirect === '/login' || redirect === '/admin/login') {
+    return dashboardPath
+  }
+  return redirect
+}
 
 const normalizeRole = (role?: string): Role | null => {
   if (role === Roles.SUPER_ADMIN || role === Roles.ADMIN) {
@@ -177,7 +185,7 @@ const handleLogin = async () => {
       setAdminProfile({ ...payload.data.admin, role: profileRole })
     }
     const redirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
-    router.replace((redirect as string) || '/admin/dashboard')
+    router.replace(resolveRedirectPath(redirect as string | undefined))
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '登录失败，请稍后重试'
   } finally {

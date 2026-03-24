@@ -2,19 +2,25 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { Roles, canAccess, isAuthenticated } from '../access'
 import type { Role } from '../access'
 
+const ADMIN_LOGIN_PATH = '/admin/login'
+const ADMIN_DASHBOARD_PATH = '/admin/dashboard'
+
+const isLoginPath = (path: string) => path === '/login' || path === ADMIN_LOGIN_PATH
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/admin/dashboard' },
+    { path: '/', redirect: ADMIN_DASHBOARD_PATH },
+    { path: '/login', redirect: ADMIN_LOGIN_PATH },
     {
-      path: '/admin/login',
+      path: ADMIN_LOGIN_PATH,
       component: () => import('../views/admin/login/index.vue')
     },
     {
       path: '/admin',
       component: () => import('../layouts/AdminLayout.vue'),
       children: [
-        { path: '', redirect: '/admin/dashboard' },
+        { path: '', redirect: ADMIN_DASHBOARD_PATH },
         { path: 'dashboard', component: () => import('../views/admin/dashboard/index.vue') },
         {
           path: 'staff',
@@ -50,13 +56,13 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  const isLogin = to.path === '/admin/login'
+  const isLogin = isLoginPath(to.path)
   const authed = isAuthenticated()
   if (!authed && !isLogin) {
-    return { path: '/admin/login', query: { redirect: to.fullPath } }
+    return { path: ADMIN_LOGIN_PATH, query: { redirect: to.fullPath } }
   }
   if (authed && isLogin) {
-    return { path: '/admin/dashboard' }
+    return { path: ADMIN_DASHBOARD_PATH }
   }
   const roles = to.meta.roles as Role[] | undefined
   if (!roles) {

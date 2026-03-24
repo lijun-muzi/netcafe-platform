@@ -7,7 +7,9 @@ public class AdminView {
   private String username;
   private String name;
   private String role;
+  private String roleLabel;
   private Integer status;
+  private String statusLabel;
   private LocalDateTime lastLoginTime;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
@@ -44,12 +46,28 @@ public class AdminView {
     this.role = role;
   }
 
+  public String getRoleLabel() {
+    return roleLabel;
+  }
+
+  public void setRoleLabel(String roleLabel) {
+    this.roleLabel = roleLabel;
+  }
+
   public Integer getStatus() {
     return status;
   }
 
   public void setStatus(Integer status) {
     this.status = status;
+  }
+
+  public String getStatusLabel() {
+    return statusLabel;
+  }
+
+  public void setStatusLabel(String statusLabel) {
+    this.statusLabel = statusLabel;
   }
 
   public LocalDateTime getLastLoginTime() {

@@ -9,7 +9,6 @@
         </div>
         <div class="hero-actions">
           <button class="ghost-btn">今日班次 09:00 - 18:00</button>
-          <button class="solid-btn">新建操作</button>
         </div>
       </div>
       <div class="admin-content">

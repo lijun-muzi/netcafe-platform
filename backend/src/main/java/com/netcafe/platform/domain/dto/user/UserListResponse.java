@@ -1,14 +1,14 @@
-package com.netcafe.platform.domain.dto.account;
+package com.netcafe.platform.domain.dto.user;
 
 import java.util.List;
 
-public class AdminListResponse {
+public class UserListResponse {
   private long total;
   private long page;
   private long size;
-  private List<AdminView> items;
+  private List<UserView> items;
 
-  public AdminListResponse(long total, long page, long size, List<AdminView> items) {
+  public UserListResponse(long total, long page, long size, List<UserView> items) {
     this.total = total;
     this.page = page;
     this.size = size;
@@ -39,11 +39,11 @@ public class AdminListResponse {
     this.size = size;
   }
 
-  public List<AdminView> getItems() {
+  public List<UserView> getItems() {
     return items;
   }
 
-  public void setItems(List<AdminView> items) {
+  public void setItems(List<UserView> items) {
     this.items = items;
   }
 }

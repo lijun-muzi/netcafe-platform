@@ -16,13 +16,23 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="status-card">
-        <p class="status-title">当前权限</p>
-        <p class="status-value">{{ roleLabel }}</p>
-        <select class="select sidebar-select" v-model="currentRole" @change="handleRoleChange">
-          <option :value="Roles.SUPER_ADMIN">超级管理员</option>
-          <option :value="Roles.ADMIN">管理员</option>
-        </select>
+      <div class="status-card profile-card">
+        <div class="profile-top">
+          <div class="profile-copy">
+            <p class="profile-eyebrow">当前登录</p>
+          </div>
+          <div class="profile-avatar">{{ profileBadgeText }}</div>
+        </div>
+        <div class="profile-meta">
+          <div class="profile-meta-item">
+            <span class="profile-meta-label">账号</span>
+            <strong class="profile-meta-value">{{ profile?.username || '—' }}</strong>
+          </div>
+          <div class="profile-meta-item">
+            <span class="profile-meta-label">角色</span>
+            <strong class="profile-meta-value">{{ roleLabel }}</strong>
+          </div>
+        </div>
       </div>
       <button class="ghost-btn full" @click="handleLogout">退出登录</button>
     </div>
@@ -30,13 +40,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Roles, clearAuth, getAuthToken, getCurrentRole, setCurrentRole } from '../access'
-import type { Role } from '../access'
+import { Roles, clearAuth, getAdminProfile, getAuthToken, getCurrentRole } from '../access'
 
 const router = useRouter()
-const currentRole = ref<Role>(getCurrentRole())
+const profile = computed(() => getAdminProfile())
+const currentRole = computed(() => profile.value?.role || getCurrentRole())
 
 const nav = [
   { path: '/admin/dashboard', label: '实时面板', icon: '01' },
@@ -53,11 +63,19 @@ const nav = [
 const visibleNav = computed(() => nav.filter((item) => !item.roles || item.roles.includes(currentRole.value)))
 
 const roleLabel = computed(() => (currentRole.value === Roles.ADMIN ? '管理员' : '超级管理员'))
+const profileBadgeText = computed(() => {
+  const name = profile.value?.name?.trim()
+  if (name) {
+    return name
+  }
 
-const handleRoleChange = () => {
-  setCurrentRole(currentRole.value)
-  router.push('/admin/dashboard')
-}
+  const username = profile.value?.username?.trim()
+  if (!username) {
+    return 'NC'
+  }
+
+  return username.slice(0, 2).toUpperCase()
+})
 
 const handleLogout = () => {
   void logoutAndExit()
