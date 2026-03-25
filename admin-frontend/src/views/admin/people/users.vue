@@ -399,11 +399,11 @@ const defaultUserForm = () => ({
   lastSessionTime: null as string | null
 })
 
-const filters = reactive({
+const defaultFilters = () => ({
   keyword: '',
   status: ''
 })
-
+const filters = reactive(defaultFilters())
 const userList = ref<UserItem[]>([])
 const loading = ref(false)
 const submitting = ref(false)
@@ -510,8 +510,7 @@ const applyFilters = () => {
 }
 
 const resetFilters = () => {
-  filters.keyword = ''
-  filters.status = ''
+  Object.assign(filters, defaultFilters())
   void fetchUsers(1)
 }
 

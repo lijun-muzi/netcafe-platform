@@ -169,13 +169,13 @@ type AuditLogItem = {
   createdAt: string | null
 }
 
-const filters = reactive({
+const defaultFilters = () => ({
   operatorKeyword: '',
   action: '',
   dateFrom: '',
   dateTo: ''
 })
-
+const filters = reactive(defaultFilters())
 const logs = ref<AuditLogItem[]>([])
 const actionOptions = ref<SelectOption[]>([])
 const detailLog = ref<AuditLogItem | null>(null)
@@ -240,10 +240,7 @@ const applyFilters = () => {
 }
 
 const resetFilters = () => {
-  filters.operatorKeyword = ''
-  filters.action = ''
-  filters.dateFrom = ''
-  filters.dateTo = ''
+  Object.assign(filters, defaultFilters())
   void fetchLogs(1)
 }
 

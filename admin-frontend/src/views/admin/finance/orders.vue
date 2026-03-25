@@ -340,17 +340,17 @@ type RechargeUserCandidate = {
   statusLabel: string
 }
 
-const orderFilters = reactive({
+const defaultOrderFilters = () => ({
   keyword: '',
   status: ''
 })
-
-const rechargeFilters = reactive({
+const defaultRechargeFilters = () => ({
   channel: '',
   dateFrom: '',
   dateTo: ''
 })
-
+const orderFilters = reactive(defaultOrderFilters())
+const rechargeFilters = reactive(defaultRechargeFilters())
 const rechargeForm = reactive({
   amount: '',
   channel: '',
@@ -458,8 +458,7 @@ const applyOrderFilters = () => {
 }
 
 const resetOrderFilters = () => {
-  orderFilters.keyword = ''
-  orderFilters.status = ''
+  Object.assign(orderFilters, defaultOrderFilters())
   void fetchOrders(1)
 }
 
@@ -475,9 +474,7 @@ const applyRechargeFilters = () => {
 }
 
 const resetRechargeFilters = () => {
-  rechargeFilters.channel = ''
-  rechargeFilters.dateFrom = ''
-  rechargeFilters.dateTo = ''
+  Object.assign(rechargeFilters, defaultRechargeFilters())
   void fetchRecharges(1)
 }
 

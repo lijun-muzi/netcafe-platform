@@ -373,13 +373,13 @@ const defaultBatchForm = () => ({
   pricePerMin: '0.10'
 })
 
-const filters = reactive({
+const defaultFilters = () => ({
   keyword: '',
   status: '',
   minPrice: '',
   maxPrice: ''
 })
-
+const filters = reactive(defaultFilters())
 const machines = ref<MachineItem[]>([])
 const templates = ref<MachineTemplate[]>([])
 const loading = ref(false)
@@ -470,10 +470,7 @@ const applyFilters = () => {
 }
 
 const resetFilters = () => {
-  filters.keyword = ''
-  filters.status = ''
-  filters.minPrice = ''
-  filters.maxPrice = ''
+  Object.assign(filters, defaultFilters())
   void fetchMachines(1)
 }
 

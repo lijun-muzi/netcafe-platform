@@ -259,11 +259,12 @@ const defaultStaffForm = () => ({
   password: ''
 })
 
-const filters = reactive({
+const defaultFilters = () => ({
   keyword: '',
   role: '',
   status: ''
 })
+const filters = reactive(defaultFilters())
 
 const roleOptions = ref<RoleOption[]>([])
 const staffList = ref<StaffItem[]>([])
@@ -359,9 +360,7 @@ const applyFilters = () => {
 }
 
 const resetFilters = () => {
-  filters.keyword = ''
-  filters.role = ''
-  filters.status = ''
+  Object.assign(filters, defaultFilters())
   void fetchStaff(1)
 }
 

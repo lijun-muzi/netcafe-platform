@@ -23,24 +23,24 @@
           <h3>状态与配置过滤</h3>
         </div>
         <div class="filter-bar">
-          <input class="input" placeholder="编号搜索" />
-          <select class="select">
-            <option>全部状态</option>
-            <option>空闲</option>
-            <option>使用中</option>
-            <option>停用</option>
+          <input v-model.trim="filters.keyword" class="input" placeholder="编号搜索" />
+          <select v-model="filters.status" class="select">
+            <option value="">全部状态</option>
+            <option value="空闲">空闲</option>
+            <option value="使用中">使用中</option>
+            <option value="停用">停用</option>
           </select>
-          <select class="select">
-            <option>单价区间</option>
-            <option>0.08 - 0.12</option>
-            <option>0.12 - 0.18</option>
+          <select v-model="filters.priceRange" class="select">
+            <option value="">单价区间</option>
+            <option value="0.08-0.12">0.08 - 0.12</option>
+            <option value="0.12-0.18">0.12 - 0.18</option>
           </select>
-          <button class="ghost-btn">重置</button>
+          <button class="ghost-btn" @click="resetFilters">重置</button>
         </div>
       </div>
 
       <div class="machine-grid">
-        <div v-for="machine in machines" :key="machine.code" class="machine-card reveal">
+        <div v-for="machine in filteredMachines" :key="machine.code" class="machine-card reveal">
           <div class="machine-meta">
             <div>
               <p class="machine-title">{{ machine.code }}</p>
@@ -71,6 +71,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed, reactive } from 'vue'
 import AppTopbar from '../../../components/AppTopbar.vue'
 import StatCard from '../../../components/StatCard.vue'
 import StatusPill from '../../../components/StatusPill.vue'
@@ -82,7 +83,15 @@ const stats = [
   { label: '今日流水', value: '¥3,284', suffix: '', note: '预计夜间峰值', tone: 'neutral' }
 ]
 
-const machines = [
+const defaultFilters = () => ({
+  keyword: '',
+  status: '',
+  priceRange: ''
+})
+
+const filters = reactive(defaultFilters())
+
+const machineSource = [
   {
     code: 'A-021',
     config: 'i7 / RTX 4070 / 32G',
@@ -90,7 +99,8 @@ const machines = [
     tone: 'using',
     user: '张伟',
     start: '10:12',
-    fee: '¥12.8'
+    fee: '¥12.8',
+    pricePerMin: 0.12
   },
   {
     code: 'A-022',
@@ -99,7 +109,8 @@ const machines = [
     tone: 'idle',
     user: '-',
     start: '-',
-    fee: '¥0.0'
+    fee: '¥0.0',
+    pricePerMin: 0.1
   },
   {
     code: 'B-014',
@@ -108,7 +119,8 @@ const machines = [
     tone: 'using',
     user: '刘阳',
     start: '09:45',
-    fee: '¥18.4'
+    fee: '¥18.4',
+    pricePerMin: 0.1
   },
   {
     code: 'C-003',
@@ -117,7 +129,25 @@ const machines = [
     tone: 'disabled',
     user: '-',
     start: '-',
-    fee: '¥0.0'
+    fee: '¥0.0',
+    pricePerMin: 0.08
   }
 ]
+
+const filteredMachines = computed(() =>
+  machineSource.filter((machine) => {
+    const keywordMatched = !filters.keyword || machine.code.toLowerCase().includes(filters.keyword.toLowerCase())
+    const statusMatched = !filters.status || machine.statusText === filters.status
+    const priceMatched =
+      !filters.priceRange ||
+      (filters.priceRange === '0.08-0.12'
+        ? machine.pricePerMin >= 0.08 && machine.pricePerMin <= 0.12
+        : machine.pricePerMin > 0.12 && machine.pricePerMin <= 0.18)
+    return keywordMatched && statusMatched && priceMatched
+  })
+)
+
+const resetFilters = () => {
+  Object.assign(filters, defaultFilters())
+}
 </script>

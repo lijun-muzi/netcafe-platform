@@ -304,17 +304,17 @@ import {
   trimToUndefined
 } from './shared'
 
-const currentFilters = reactive({
+const defaultCurrentFilters = () => ({
   keyword: ''
 })
-
-const historyFilters = reactive({
+const defaultHistoryFilters = () => ({
   keyword: '',
   status: '',
   dateFrom: '',
   dateTo: ''
 })
-
+const currentFilters = reactive(defaultCurrentFilters())
+const historyFilters = reactive(defaultHistoryFilters())
 const openForm = reactive({
   userKeyword: '',
   machineKeyword: ''
@@ -413,7 +413,7 @@ const applyCurrentFilters = () => {
 }
 
 const resetCurrentFilters = () => {
-  currentFilters.keyword = ''
+  Object.assign(currentFilters, defaultCurrentFilters())
   void fetchCurrentSessions(1)
 }
 
@@ -429,10 +429,7 @@ const applyHistoryFilters = () => {
 }
 
 const resetHistoryFilters = () => {
-  historyFilters.keyword = ''
-  historyFilters.status = ''
-  historyFilters.dateFrom = ''
-  historyFilters.dateTo = ''
+  Object.assign(historyFilters, defaultHistoryFilters())
   void fetchHistorySessions(1)
 }
 
