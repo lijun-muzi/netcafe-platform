@@ -14,9 +14,9 @@ spring:
     # 数据库连接 URL（MySQL 8.x，时区上海，UTF-8）
     url: jdbc:mysql://localhost:3306/netcafe-platform?useSSL=false&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     # 数据库用户名
-    username: netcafe_dev
+    username: root
     # 数据库密码
-    password: netcafe123
+    password: Lijun13507489163.
     # JDBC 驱动类
     driver-class-name: com.mysql.cj.jdbc.Driver
 

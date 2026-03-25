@@ -74,6 +74,13 @@
         <div v-else class="trend-layout">
           <div class="trend-chart">
             <div v-for="point in trendBars" :key="point.label" class="trend-column">
+              <div class="trend-tooltip">
+                <strong>{{ point.label }}</strong>
+                <span>充值流水：{{ point.cashFlowLabel }}</span>
+                <span>上机收入：{{ point.sessionRevenueLabel }}</span>
+                <span>上机时长：{{ point.durationLabel }}</span>
+                <span>活跃用户：{{ point.activeUsersLabel }}</span>
+              </div>
               <div class="trend-bars">
                 <span class="trend-bar trend-bar-cash" :style="{ height: `${point.cashHeight}%` }"></span>
                 <span class="trend-bar trend-bar-revenue" :style="{ height: `${point.revenueHeight}%` }"></span>
@@ -291,7 +298,6 @@ type StatsOverview = {
   arpuLabel: string
   peakHour: string
 }
-
 type StatsTrendPoint = {
   label: string
   cashFlowAmount: number
@@ -303,14 +309,12 @@ type StatsTrendPoint = {
   activeUsers: number
   activeUsersLabel: string
 }
-
 type StatsTrend = {
   granularity: 'day' | 'month'
   startDate: string
   endDate: string
   points: StatsTrendPoint[]
 }
-
 type StatsMachineUsage = {
   machineId: number
   machineCode: string
@@ -321,7 +325,6 @@ type StatsMachineUsage = {
   revenueAmount: number
   revenueLabel: string
 }
-
 type StatsMachineTop = {
   machineId: number
   machineCode: string
@@ -329,7 +332,6 @@ type StatsMachineTop = {
   revenueLabel: string
   sessionCount: number
 }
-
 type StatsIdleMachine = {
   machineId: number
   machineCode: string
@@ -340,7 +342,6 @@ type StatsIdleMachine = {
   idleRate: number
   idleRateLabel: string
 }
-
 type StatsUserTop = {
   userId: number
   userName: string
@@ -350,7 +351,6 @@ type StatsUserTop = {
   totalDurationMinutes: number
   totalDurationLabel: string
 }
-
 type StatsLowBalanceUser = {
   userId: number
   userName: string
@@ -360,30 +360,28 @@ type StatsLowBalanceUser = {
   remainingMinutes: number
   remainingMinutesLabel: string
 }
-
 type StatsRankings = {
   machineRevenueTop: StatsMachineTop[]
   userConsumeTop: StatsUserTop[]
   lowBalanceUsers: StatsLowBalanceUser[]
 }
-
 type TrendBar = {
   label: string
   cashHeight: number
   revenueHeight: number
   activeUsersLabel: string
+  cashFlowLabel: string
+  sessionRevenueLabel: string
+  durationLabel: string
 }
-
 const today = new Date()
 const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-
 const toDateInput = (value: Date) => {
   const year = value.getFullYear()
   const month = String(value.getMonth() + 1).padStart(2, '0')
   const day = String(value.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
-
 const defaultFilters = () => ({
   start: toDateInput(firstDay),
   end: toDateInput(today),
@@ -391,7 +389,6 @@ const defaultFilters = () => ({
   limit: '5',
   threshold: ''
 })
-
 const filters = reactive(defaultFilters())
 const loading = ref(false)
 const notice = ref<NoticeState>({ type: 'success', message: '' })
@@ -400,7 +397,6 @@ const trend = ref<StatsTrend | null>(null)
 const machineUsage = ref<(StatsMachineUsage & { usageRatePercent: string })[]>([])
 const idleMachines = ref<StatsIdleMachine[]>([])
 const rankings = ref<StatsRankings | null>(null)
-
 const normalizedLimit = computed(() => {
   const value = Number(filters.limit)
   if (!Number.isFinite(value) || value <= 0) {
@@ -408,7 +404,6 @@ const normalizedLimit = computed(() => {
   }
   return Math.min(20, Math.floor(value))
 })
-
 const normalizedThreshold = computed(() => {
   const value = Number(filters.threshold)
   if (!Number.isFinite(value) || value < 0) {
@@ -416,28 +411,24 @@ const normalizedThreshold = computed(() => {
   }
   return Math.floor(value)
 })
-
 const dateRangeLabel = computed(() => {
   if (!overview.value) {
     return `${filters.start} 至 ${filters.end}`
   }
   return `${formatDate(overview.value.startDate)} 至 ${formatDate(overview.value.endDate)}`
 })
-
 const thresholdLabel = computed(() => {
   if (normalizedThreshold.value === undefined) {
     return '系统默认值'
   }
   return `${normalizedThreshold.value} 分钟`
 })
-
 const periodNote = computed(() => (overview.value ? `${dateRangeLabel.value}` : '等待加载'))
 const peakHourNote = computed(() => (overview.value?.peakHour ? `高峰 ${overview.value.peakHour}` : '等待加载'))
 const durationNote = computed(() => (overview.value?.sessionRevenueLabel ? `收入 ${overview.value.sessionRevenueLabel}` : '等待加载'))
 const activeUserNote = computed(() => (overview.value?.activeUsersLabel ? `${overview.value.activeUsersLabel} 内有充值或上机` : '等待加载'))
 const arpuNote = computed(() => (overview.value?.arpuLabel ? '上机收入 / 活跃用户' : '等待加载'))
 const summaryNote = computed(() => (trend.value?.granularity === 'month' ? '按月汇总走势' : '按日汇总走势'))
-
 const trendBars = computed<TrendBar[]>(() => {
   const points = trend.value?.points ?? []
   if (points.length === 0) {
@@ -451,15 +442,16 @@ const trendBars = computed<TrendBar[]>(() => {
     label: item.label,
     cashHeight: Math.max(10, Math.round(((Number(item.cashFlowAmount) || 0) / maxCash) * 100)),
     revenueHeight: Math.max(10, Math.round(((Number(item.sessionRevenueAmount) || 0) / maxRevenue) * 100)),
-    activeUsersLabel: item.activeUsersLabel
+    activeUsersLabel: item.activeUsersLabel,
+    cashFlowLabel: item.cashFlowLabel,
+    sessionRevenueLabel: item.sessionRevenueLabel,
+    durationLabel: item.durationLabel
   }))
 })
-
 const buildBaseQuery = () => ({
   start: filters.start,
   end: filters.end
 })
-
 const validateFilters = () => {
   if (filters.start && filters.end && filters.start > filters.end) {
     notice.value = {
@@ -484,11 +476,9 @@ const validateFilters = () => {
 
   return true
 }
-
 const fetchOverview = async () => {
   overview.value = await requestJson<StatsOverview>(withQuery('/stats/overview', buildBaseQuery()))
 }
-
 const fetchTrend = async () => {
   trend.value = await requestJson<StatsTrend>(
     withQuery('/stats/trend', {
@@ -497,7 +487,6 @@ const fetchTrend = async () => {
     })
   )
 }
-
 const fetchMachineUsage = async () => {
   const data = await requestJson<StatsMachineUsage[]>(
     withQuery('/stats/machine-usage', {
@@ -510,7 +499,6 @@ const fetchMachineUsage = async () => {
     usageRatePercent: `${Math.min(100, Math.max(0, Number(item.usageRate) * 100))}%`
   }))
 }
-
 const fetchIdleMachines = async () => {
   idleMachines.value = await requestJson<StatsIdleMachine[]>(
     withQuery('/stats/idle-machines', {
@@ -519,7 +507,6 @@ const fetchIdleMachines = async () => {
     })
   )
 }
-
 const fetchRankings = async () => {
   rankings.value = await requestJson<StatsRankings>(
     withQuery('/stats/rankings', {
@@ -529,7 +516,6 @@ const fetchRankings = async () => {
     })
   )
 }
-
 const refreshAll = async () => {
   if (!validateFilters()) {
     return
@@ -549,16 +535,13 @@ const refreshAll = async () => {
     loading.value = false
   }
 }
-
 const applyFilters = async () => {
   await refreshAll()
 }
-
 const resetFilters = async () => {
   Object.assign(filters, defaultFilters())
   await refreshAll()
 }
-
 onMounted(async () => {
   await refreshAll()
 })
@@ -612,14 +595,12 @@ onMounted(async () => {
 .legend-revenue {
   background: rgba(29, 154, 163, 0.9);
 }
-
 .trend-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
   gap: 16px;
   align-items: stretch;
 }
-
 .trend-chart {
   min-height: 260px;
   padding: 18px 18px 14px;
@@ -633,25 +614,59 @@ onMounted(async () => {
   gap: 12px;
   align-items: end;
 }
-
 .trend-column {
   min-width: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
 }
-
+.trend-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  min-width: 132px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(23, 23, 23, 0.94);
+  color: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 34px rgba(23, 23, 23, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 4px;
+  z-index: 12;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 160ms ease,
+    visibility 160ms ease,
+    transform 160ms ease;
+  white-space: nowrap;
+}
+.trend-column:hover .trend-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(-4px);
+}
+.trend-tooltip strong {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.trend-tooltip span {
+  font-size: 12px;
+  line-height: 1.45;
+}
 .trend-column strong {
   font-family: var(--font-mono);
   font-size: 13px;
 }
-
 .trend-column small {
   color: var(--muted);
   font-size: 12px;
 }
-
 .trend-bars {
   width: 100%;
   height: 176px;
@@ -660,44 +675,36 @@ onMounted(async () => {
   justify-content: center;
   gap: 6px;
 }
-
 .trend-bar {
   width: calc(50% - 4px);
   min-height: 10px;
   border-radius: 10px 10px 4px 4px;
 }
-
 .trend-bar-cash {
   background: linear-gradient(180deg, rgba(255, 138, 0, 0.95), rgba(255, 194, 116, 0.7));
 }
-
 .trend-bar-revenue {
   background: linear-gradient(180deg, rgba(29, 154, 163, 0.95), rgba(98, 203, 211, 0.72));
 }
-
 .trend-detail-wrap,
 .ranking-table-wrap {
   height: 100%;
 }
-
 .compact-table th,
 .compact-table td {
   padding: 10px 8px;
 }
-
 .usage-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
-
 .usage-item {
   padding: 14px;
   border-radius: 16px;
   background: rgba(23, 23, 23, 0.03);
   border: 1px solid rgba(23, 23, 23, 0.05);
 }
-
 .usage-head,
 .usage-meta {
   display: flex;
@@ -705,18 +712,15 @@ onMounted(async () => {
   gap: 12px;
   align-items: center;
 }
-
 .usage-head strong {
   font-family: var(--font-mono);
   font-size: 15px;
 }
-
 .usage-head span,
 .usage-meta {
   color: var(--muted);
   font-size: 13px;
 }
-
 .usage-track {
   height: 10px;
   margin: 12px 0 10px;
@@ -724,27 +728,23 @@ onMounted(async () => {
   background: rgba(23, 23, 23, 0.08);
   overflow: hidden;
 }
-
 .usage-fill {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, rgba(29, 111, 209, 0.92), rgba(29, 154, 163, 0.85));
 }
-
 .side-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 16px;
 }
-
 .stats-ranking-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
-
 .ranking-card {
   display: flex;
   flex-direction: column;
