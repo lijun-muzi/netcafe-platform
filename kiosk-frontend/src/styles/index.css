@@ -60,6 +60,13 @@ select {
   border-radius: 10px;
   border: 1px solid var(--border);
   background: #fff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(255, 138, 0, 0.6);
+  box-shadow: 0 0 0 4px rgba(255, 138, 0, 0.12);
 }
 
 .solid-btn,
@@ -80,6 +87,14 @@ select {
 .solid-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 20px rgba(255, 138, 0, 0.25);
+}
+
+.solid-btn:disabled,
+.ghost-btn:disabled {
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.55;
 }
 
 .ghost-btn {
@@ -156,7 +171,6 @@ select {
   flex-direction: column;
   gap: 12px;
 }
-
 
 .kiosk-metric {
   font-family: var(--font-display);

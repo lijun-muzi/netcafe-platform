@@ -19,6 +19,8 @@ public class SessionOrder {
   private BigDecimal amount;
   private Integer billedMinutes;
   private LocalDateTime lastBilledTime;
+  private LocalDateTime pausedAt;
+  private Integer pausedDurationSeconds;
   private Integer status;
   private Long forceByAdminId;
   private LocalDateTime createdAt;
@@ -102,6 +104,22 @@ public class SessionOrder {
 
   public void setLastBilledTime(LocalDateTime lastBilledTime) {
     this.lastBilledTime = lastBilledTime;
+  }
+
+  public LocalDateTime getPausedAt() {
+    return pausedAt;
+  }
+
+  public void setPausedAt(LocalDateTime pausedAt) {
+    this.pausedAt = pausedAt;
+  }
+
+  public Integer getPausedDurationSeconds() {
+    return pausedDurationSeconds;
+  }
+
+  public void setPausedDurationSeconds(Integer pausedDurationSeconds) {
+    this.pausedDurationSeconds = pausedDurationSeconds;
   }
 
   public Integer getStatus() {

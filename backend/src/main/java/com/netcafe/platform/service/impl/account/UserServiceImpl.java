@@ -21,17 +21,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
   @Override
   @Transactional(rollbackFor = Exception.class)
-  public boolean recharge(Long userId, BigDecimal amount, String channel, String remark, Long operatorAdminId) {
+  public RechargeRecord recharge(Long userId, BigDecimal amount, String channel, String remark, Long operatorAdminId) {
     User user = getById(userId);
     if (user == null) {
-      return false;
+      return null;
     }
     BigDecimal currentBalance = user.getBalance() == null ? BigDecimal.ZERO : user.getBalance();
     user.setBalance(currentBalance.add(amount));
     user.setUpdatedAt(LocalDateTime.now());
     boolean updated = updateById(user);
     if (!updated) {
-      return false;
+      return null;
     }
 
     RechargeRecord record = new RechargeRecord();
@@ -43,6 +43,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     record.setCreatedAt(LocalDateTime.now());
     rechargeRecordMapper.insert(record);
 
-    return true;
+    return record;
   }
 }

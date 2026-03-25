@@ -13,13 +13,16 @@ import com.netcafe.platform.domain.entity.machine.Machine;
 import com.netcafe.platform.domain.entity.session.SessionOrder;
 import com.netcafe.platform.service.account.UserService;
 import com.netcafe.platform.service.machine.MachineService;
+import com.netcafe.platform.service.session.SessionBillingCalculator;
 import com.netcafe.platform.service.session.SessionService;
+import com.netcafe.platform.service.system.AuditLogService;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,29 +47,66 @@ public class SessionAdminController {
   private static final int SESSION_ONGOING = 0;
   private static final int SESSION_FINISHED = 1;
   private static final int SESSION_FORCED = 2;
+  private static final int SESSION_PAUSED = 3;
 
   private final SessionService sessionService;
   private final UserService userService;
   private final MachineService machineService;
+  private final AuditLogService auditLogService;
 
   public SessionAdminController(
       SessionService sessionService,
       UserService userService,
-      MachineService machineService
+      MachineService machineService,
+      AuditLogService auditLogService
   ) {
     this.sessionService = sessionService;
     this.userService = userService;
     this.machineService = machineService;
+    this.auditLogService = auditLogService;
   }
 
   @PostMapping("/open")
   public ApiResponse<Boolean> open(@Valid @RequestBody OpenSessionRequest request) {
-    return ApiResponse.success(sessionService.openSession(request.getUserId(), request.getMachineId()));
+    Long sessionId = sessionService.openSession(request.getUserId(), request.getMachineId());
+    if (sessionId == null) {
+      return ApiResponse.success(false);
+    }
+    SessionOrder order = sessionService.getById(sessionId);
+    User user = userService.getById(request.getUserId());
+    Machine machine = machineService.getById(request.getMachineId());
+    auditLogService.record(
+        requireCurrentAdminId(),
+        resolveCurrentAdminRole(),
+        AuditLogService.ACTION_OPEN_SESSION,
+        "SESSION",
+        sessionId,
+        null,
+        buildOpenSnapshot(order, user, machine)
+    );
+    return ApiResponse.success(sessionId != null);
   }
 
   @PutMapping("/{id}/force-end")
   public ApiResponse<Boolean> forceEnd(@PathVariable Long id) {
-    return ApiResponse.success(sessionService.forceEnd(id, requireCurrentAdminId()));
+    SessionOrder before = requireSessionOrder(id);
+    User beforeUser = userService.getById(before.getUserId());
+    Machine beforeMachine = machineService.getById(before.getMachineId());
+    Long operatorAdminId = requireCurrentAdminId();
+    boolean ended = sessionService.forceEnd(id, operatorAdminId);
+    SessionOrder after = requireSessionOrder(id);
+    User afterUser = userService.getById(after.getUserId());
+    Machine afterMachine = machineService.getById(after.getMachineId());
+    auditLogService.record(
+        operatorAdminId,
+        resolveCurrentAdminRole(),
+        AuditLogService.ACTION_FORCE_END_SESSION,
+        "SESSION",
+        id,
+        buildSessionSnapshot(before, beforeUser, beforeMachine),
+        buildSessionSnapshot(after, afterUser, afterMachine)
+    );
+    return ApiResponse.success(ended);
   }
 
   @GetMapping("/current")
@@ -78,7 +118,7 @@ public class SessionAdminController {
     long pageSize = Math.max(1, Math.min(size, 200));
     Page<SessionOrder> pageRequest = new Page<>(page, pageSize);
     LambdaQueryWrapper<SessionOrder> wrapper = new LambdaQueryWrapper<>();
-    wrapper.eq(SessionOrder::getStatus, SESSION_ONGOING);
+    wrapper.in(SessionOrder::getStatus, List.of(SESSION_ONGOING, SESSION_PAUSED));
     if (!applyKeywordFilter(keyword, wrapper)) {
       return ApiResponse.success(new SessionListResponse(0, page, pageSize, List.of()));
     }
@@ -215,28 +255,14 @@ public class SessionAdminController {
   }
 
   private Integer resolveDurationMinutes(SessionOrder order, boolean ongoingMode) {
-    if (order.getDurationMinutes() != null && order.getDurationMinutes() > 0) {
-      return order.getDurationMinutes();
-    }
-    if (order.getBilledMinutes() != null && order.getBilledMinutes() > 0) {
-      return order.getBilledMinutes();
-    }
-    if (!ongoingMode || order.getStartTime() == null) {
-      return 0;
-    }
-    return (int) Math.max(Duration.between(order.getStartTime(), LocalDateTime.now()).toMinutes(), 0);
+    return SessionBillingCalculator.resolveDurationMinutes(order, LocalDateTime.now(), ongoingMode);
   }
 
   private BigDecimal resolveCurrentFee(SessionOrder order, Integer durationMinutes, boolean ongoingMode) {
     if (!ongoingMode) {
       return defaultValue(order.getAmount());
     }
-    if (order.getAmount() != null && order.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-      return order.getAmount();
-    }
-    BigDecimal price = defaultValue(order.getPriceSnapshot());
-    return price.multiply(BigDecimal.valueOf(durationMinutes == null ? 0 : durationMinutes))
-        .setScale(2, RoundingMode.HALF_UP);
+    return SessionBillingCalculator.resolveLiveCharge(order, LocalDateTime.now(), true);
   }
 
   private BigDecimal defaultValue(BigDecimal value) {
@@ -250,6 +276,9 @@ public class SessionAdminController {
     if (Objects.equals(status, SESSION_FORCED)) {
       return "强制结束";
     }
+    if (Objects.equals(status, SESSION_PAUSED)) {
+      return "暂停中";
+    }
     return "进行中";
   }
 
@@ -259,6 +288,9 @@ public class SessionAdminController {
     }
     if (Objects.equals(status, SESSION_FORCED)) {
       return "forced";
+    }
+    if (Objects.equals(status, SESSION_PAUSED)) {
+      return "warning";
     }
     return "using";
   }
@@ -278,6 +310,49 @@ public class SessionAdminController {
     }
   }
 
+  private SessionOrder requireSessionOrder(Long id) {
+    SessionOrder order = sessionService.getById(id);
+    if (order == null) {
+      throw new BusinessException(ResultCode.NOT_FOUND, "上机订单不存在");
+    }
+    return order;
+  }
+
+  private Map<String, Object> buildOpenSnapshot(SessionOrder order, User user, Machine machine) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("targetLabel", buildSessionTargetLabel(user, machine));
+    snapshot.put("userName", user == null ? null : user.getName());
+    snapshot.put("machineCode", machine == null ? null : machine.getCode());
+    snapshot.put("priceSnapshot", order == null ? null : order.getPriceSnapshot());
+    snapshot.put("startTime", order == null ? null : order.getStartTime());
+    snapshot.put("changeSummary", "用户 " + (user == null ? "-" : user.getName()) + " 在机位 "
+        + (machine == null ? "-" : machine.getCode()) + " 开通上机");
+    return snapshot;
+  }
+
+  private Map<String, Object> buildSessionSnapshot(SessionOrder order, User user, Machine machine) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("targetLabel", buildSessionTargetLabel(user, machine));
+    snapshot.put("userName", user == null ? null : user.getName());
+    snapshot.put("machineCode", machine == null ? null : machine.getCode());
+    snapshot.put("status", order == null ? null : order.getStatus());
+    snapshot.put("amount", order == null ? null : order.getAmount());
+    snapshot.put("startTime", order == null ? null : order.getStartTime());
+    snapshot.put("endTime", order == null ? null : order.getEndTime());
+    snapshot.put(
+        "changeSummary",
+        "订单金额 "
+            + (order == null || order.getAmount() == null ? BigDecimal.ZERO : order.getAmount().setScale(2, RoundingMode.HALF_UP))
+            + "，状态 "
+            + (order == null ? "-" : resolveStatusLabel(order.getStatus()))
+    );
+    return snapshot;
+  }
+
+  private String buildSessionTargetLabel(User user, Machine machine) {
+    return "用户 " + (user == null ? "-" : user.getName()) + " / 机位 " + (machine == null ? "-" : machine.getCode());
+  }
+
   private Long requireCurrentAdminId() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication == null || authentication.getDetails() == null) {
@@ -288,5 +363,18 @@ public class SessionAdminController {
     } catch (NumberFormatException ex) {
       throw new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员");
     }
+  }
+
+  private String resolveCurrentAdminRole() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null) {
+      throw new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员");
+    }
+    return authentication.getAuthorities().stream()
+        .map(authority -> authority.getAuthority())
+        .filter(role -> role.startsWith("ROLE_"))
+        .map(role -> role.substring(5))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员"));
   }
 }

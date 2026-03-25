@@ -1,8 +1,11 @@
 package com.netcafe.platform.controller.user;
 
 import com.netcafe.platform.common.ApiResponse;
-import com.netcafe.platform.domain.entity.session.SessionOrder;
+import com.netcafe.platform.common.BusinessException;
+import com.netcafe.platform.common.ResultCode;
 import com.netcafe.platform.service.session.SessionService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,9 +21,18 @@ public class UserSessionController {
 
   @PostMapping("/user-end")
   public ApiResponse<Boolean> userEnd() {
-    // TODO: 基于当前登录用户与进行中订单结算
-    SessionOrder order = new SessionOrder();
-    order.setStatus(1);
-    return ApiResponse.success(sessionService.updateById(order));
+    return ApiResponse.success(sessionService.userEnd(requireCurrentUserId()) != null);
+  }
+
+  private Long requireCurrentUserId() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null || authentication.getDetails() == null) {
+      throw new BusinessException(ResultCode.UNAUTHORIZED, "未登录或登录已过期");
+    }
+    try {
+      return Long.valueOf(String.valueOf(authentication.getDetails()));
+    } catch (NumberFormatException ex) {
+      throw new BusinessException(ResultCode.UNAUTHORIZED, "未登录或登录已过期");
+    }
   }
 }

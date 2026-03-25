@@ -12,11 +12,11 @@ spring:
       enabled: true
   datasource:
     # 数据库连接 URL（MySQL 8.x，时区上海，UTF-8）
-    url: jdbc:mysql://localhost:3306/netcafe-platform?useSSL=false&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    # 数据库用户名（可通过环境变量覆盖）
-    username: ${NETCAFE_DB_USERNAME:root}
-    # 数据库密码（必须通过环境变量提供，避免明文入库）
-    password: ${NETCAFE_DB_PASSWORD:}
+    url: jdbc:mysql://localhost:3306/netcafe-platform?useSSL=false&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    # 数据库用户名
+    username: netcafe_dev
+    # 数据库密码
+    password: netcafe123
     # JDBC 驱动类
     driver-class-name: com.mysql.cj.jdbc.Driver
 
@@ -31,8 +31,8 @@ mybatis-plus:
 
 app:
   jwt:
-    # JWT 签名密钥（生产环境必须通过环境变量提供）
-    secret: ${NETCAFE_JWT_SECRET:netcafe-local-dev-secret-change-me}
+    # JWT 签名密钥
+    secret: netcafe-local-dev-secret-change-me
     # Token 有效期（秒）
     expires-in: 7200
   login:

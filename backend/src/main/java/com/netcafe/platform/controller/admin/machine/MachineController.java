@@ -17,7 +17,9 @@ import com.netcafe.platform.domain.entity.machine.Machine;
 import com.netcafe.platform.domain.entity.session.SessionOrder;
 import com.netcafe.platform.service.account.UserService;
 import com.netcafe.platform.service.machine.MachineService;
+import com.netcafe.platform.service.session.SessionBillingCalculator;
 import com.netcafe.platform.service.session.SessionService;
+import com.netcafe.platform.service.system.AuditLogService;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -47,23 +49,28 @@ public class MachineController {
   private static final int STATUS_IDLE = 0;
   private static final int STATUS_USING = 1;
   private static final int STATUS_DISABLED = 2;
+  private static final int STATUS_LOCKED = 3;
   private static final int SESSION_ONGOING = 0;
+  private static final int SESSION_PAUSED = 3;
   private static final BigDecimal DEFAULT_PRICE = new BigDecimal("0.1000");
 
   private final MachineService machineService;
   private final SessionService sessionService;
   private final UserService userService;
+  private final AuditLogService auditLogService;
   private final ObjectMapper objectMapper;
 
   public MachineController(
       MachineService machineService,
       SessionService sessionService,
       UserService userService,
+      AuditLogService auditLogService,
       ObjectMapper objectMapper
   ) {
     this.machineService = machineService;
     this.sessionService = sessionService;
     this.userService = userService;
+    this.auditLogService = auditLogService;
     this.objectMapper = objectMapper;
   }
 
@@ -103,15 +110,12 @@ public class MachineController {
 
   @PostMapping
   public ApiResponse<Boolean> create(@Valid @RequestBody MachineCreateRequest request) {
-    validateStatus(request.getStatus(), true);
+    validateStatus(request.getStatus(), false);
     ensurePriceValid(request.getPricePerMin());
     ensureCodeAvailable(request.getCode(), null);
     Machine machine = new Machine();
     machine.setCode(request.getCode().trim());
     machine.setStatus(request.getStatus() == null ? STATUS_IDLE : request.getStatus());
-    if (machine.getStatus() == STATUS_USING) {
-      throw new BusinessException(ResultCode.BAD_REQUEST, "新增机位不能直接设置为使用中");
-    }
     machine.setPricePerMin(request.getPricePerMin() == null ? DEFAULT_PRICE : request.getPricePerMin());
     machine.setConfigJson(request.getConfigJson());
     machine.setTemplateId(request.getTemplateId());
@@ -124,13 +128,13 @@ public class MachineController {
   @PutMapping("/{id}")
   public ApiResponse<Boolean> update(@PathVariable Long id, @Valid @RequestBody MachineUpdateRequest request) {
     Machine existing = requireMachine(id);
-    validateStatus(request.getStatus(), true);
+    validateStatus(request.getStatus(), false);
     ensurePriceValid(request.getPricePerMin());
     if (StringUtils.hasText(request.getCode())) {
       ensureCodeAvailable(request.getCode(), id);
     }
     Integer targetStatus = request.getStatus() == null ? existing.getStatus() : request.getStatus();
-    if (Objects.equals(targetStatus, STATUS_DISABLED) && hasOngoingSession(id)) {
+    if (Objects.equals(targetStatus, STATUS_DISABLED) && hasActiveSession(id)) {
       throw new BusinessException(ResultCode.BAD_REQUEST, "机位使用中，无法直接停用");
     }
     Machine machine = new Machine();
@@ -164,10 +168,7 @@ public class MachineController {
     }
     validateStatus(request.getStatus(), false);
     requireMachine(id);
-    if (request.getStatus() == STATUS_USING) {
-      throw new BusinessException(ResultCode.BAD_REQUEST, "不能手动将机位设置为使用中");
-    }
-    if (request.getStatus() == STATUS_DISABLED && hasOngoingSession(id)) {
+    if (request.getStatus() == STATUS_DISABLED && hasActiveSession(id)) {
       throw new BusinessException(ResultCode.BAD_REQUEST, "机位使用中，无法停用");
     }
     Machine machine = new Machine();
@@ -183,12 +184,35 @@ public class MachineController {
     if (request.getPricePerMin() == null) {
       throw new BusinessException(ResultCode.BAD_REQUEST, "pricePerMin不能为空");
     }
-    return ApiResponse.success(machineService.updatePrice(id, request.getPricePerMin(), requireCurrentAdminId()));
+    Machine before = requireMachine(id);
+    Long operatorAdminId = requireCurrentAdminId();
+    boolean updated = machineService.updatePrice(id, request.getPricePerMin(), operatorAdminId);
+    Machine after = requireMachine(id);
+    auditLogService.record(
+        operatorAdminId,
+        resolveCurrentAdminRole(),
+        AuditLogService.ACTION_UPDATE_MACHINE_PRICE,
+        "MACHINE",
+        id,
+        buildMachinePriceSnapshot(before),
+        buildMachinePriceSnapshot(after)
+    );
+    return ApiResponse.success(updated);
   }
 
   @PostMapping("/batch-create")
   public ApiResponse<Boolean> batchCreate(@Valid @RequestBody MachineBatchCreateRequest request) {
-    return ApiResponse.success(machineService.batchCreate(request));
+    boolean created = machineService.batchCreate(request);
+    auditLogService.record(
+        requireCurrentAdminId(),
+        resolveCurrentAdminRole(),
+        AuditLogService.ACTION_BATCH_CREATE_MACHINE,
+        "MACHINE_BATCH",
+        request.getTemplateId(),
+        null,
+        buildBatchCreateSnapshot(request)
+    );
+    return ApiResponse.success(created);
   }
 
   private MachineListResponse queryMachines(
@@ -247,7 +271,7 @@ public class MachineController {
     }
     return sessionService.list(new LambdaQueryWrapper<SessionOrder>()
             .in(SessionOrder::getMachineId, machineIds)
-            .eq(SessionOrder::getStatus, SESSION_ONGOING))
+            .in(SessionOrder::getStatus, List.of(SESSION_ONGOING, SESSION_PAUSED)))
         .stream()
         .collect(Collectors.toMap(SessionOrder::getMachineId, order -> order, (left, right) -> left));
   }
@@ -291,6 +315,9 @@ public class MachineController {
     if (Objects.equals(status, STATUS_USING)) {
       return "使用中";
     }
+    if (Objects.equals(status, STATUS_LOCKED)) {
+      return "暂停锁定";
+    }
     if (Objects.equals(status, STATUS_DISABLED)) {
       return "停用";
     }
@@ -300,6 +327,9 @@ public class MachineController {
   private String resolveMachineStatusTone(Integer status) {
     if (Objects.equals(status, STATUS_USING)) {
       return "using";
+    }
+    if (Objects.equals(status, STATUS_LOCKED)) {
+      return "warning";
     }
     if (Objects.equals(status, STATUS_DISABLED)) {
       return "disabled";
@@ -343,36 +373,25 @@ public class MachineController {
   }
 
   private Integer resolveCurrentDuration(SessionOrder order) {
-    if (order.getDurationMinutes() != null && order.getDurationMinutes() > 0) {
-      return order.getDurationMinutes();
-    }
-    if (order.getBilledMinutes() != null && order.getBilledMinutes() > 0) {
-      return order.getBilledMinutes();
-    }
-    if (order.getStartTime() == null) {
-      return 0;
-    }
-    return (int) Math.max(Duration.between(order.getStartTime(), LocalDateTime.now()).toMinutes(), 0);
+    return SessionBillingCalculator.resolveDurationMinutes(order, LocalDateTime.now(), true);
   }
 
   private BigDecimal resolveCurrentFee(SessionOrder order, Integer durationMinutes) {
-    if (order.getAmount() != null && order.getAmount().compareTo(BigDecimal.ZERO) > 0) {
-      return order.getAmount();
-    }
-    BigDecimal price = order.getPriceSnapshot() == null ? BigDecimal.ZERO : order.getPriceSnapshot();
-    return price.multiply(BigDecimal.valueOf(durationMinutes == null ? 0 : durationMinutes))
-        .setScale(2, RoundingMode.HALF_UP);
+    return SessionBillingCalculator.resolveLiveCharge(order, LocalDateTime.now(), true);
   }
 
   private void validateStatus(Integer status, boolean allowUsing) {
     if (status == null) {
       return;
     }
-    if (status != STATUS_IDLE && status != STATUS_USING && status != STATUS_DISABLED) {
+    if (status != STATUS_IDLE
+        && status != STATUS_USING
+        && status != STATUS_DISABLED
+        && status != STATUS_LOCKED) {
       throw new BusinessException(ResultCode.BAD_REQUEST, "status不合法");
     }
-    if (!allowUsing && status == STATUS_USING) {
-      throw new BusinessException(ResultCode.BAD_REQUEST, "不能手动将机位设置为使用中");
+    if (!allowUsing && (status == STATUS_USING || status == STATUS_LOCKED)) {
+      throw new BusinessException(ResultCode.BAD_REQUEST, "不能手动将机位设置为使用中或暂停锁定");
     }
   }
 
@@ -412,10 +431,10 @@ public class MachineController {
     return machine;
   }
 
-  private boolean hasOngoingSession(Long machineId) {
+  private boolean hasActiveSession(Long machineId) {
     return sessionService.count(new LambdaQueryWrapper<SessionOrder>()
         .eq(SessionOrder::getMachineId, machineId)
-        .eq(SessionOrder::getStatus, SESSION_ONGOING)) > 0;
+        .in(SessionOrder::getStatus, List.of(SESSION_ONGOING, SESSION_PAUSED))) > 0;
   }
 
   private Long requireCurrentAdminId() {
@@ -436,5 +455,45 @@ public class MachineController {
         .noneMatch(authority -> "ROLE_SUPER_ADMIN".equals(authority.getAuthority()))) {
       throw new BusinessException(ResultCode.FORBIDDEN, "只有超级管理员可以调价");
     }
+  }
+
+  private String resolveCurrentAdminRole() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null) {
+      throw new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员");
+    }
+    return authentication.getAuthorities().stream()
+        .map(authority -> authority.getAuthority())
+        .filter(role -> role.startsWith("ROLE_"))
+        .map(role -> role.substring(5))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员"));
+  }
+
+  private Map<String, Object> buildMachinePriceSnapshot(Machine machine) {
+    Map<String, Object> snapshot = new HashMap<>();
+    snapshot.put("targetLabel", machine.getCode());
+    snapshot.put("pricePerMin", machine.getPricePerMin());
+    snapshot.put(
+        "changeSummary",
+        "机位 " + machine.getCode() + " 单价 " + machine.getPricePerMin().setScale(2, RoundingMode.HALF_UP) + " 元/分钟"
+    );
+    return snapshot;
+  }
+
+  private Map<String, Object> buildBatchCreateSnapshot(MachineBatchCreateRequest request) {
+    Map<String, Object> snapshot = new HashMap<>();
+    snapshot.put("targetLabel", request.getCodePrefix() + "批量建机位");
+    snapshot.put("templateId", request.getTemplateId());
+    snapshot.put("count", request.getCount());
+    snapshot.put("startNo", request.getStartNo());
+    snapshot.put("codePrefix", request.getCodePrefix());
+    snapshot.put("codeWidth", request.getCodeWidth());
+    snapshot.put("pricePerMin", request.getPricePerMin());
+    snapshot.put(
+        "changeSummary",
+        "模板 " + request.getTemplateId() + " 生成 " + request.getCount() + " 台机位，编号前缀 " + request.getCodePrefix()
+    );
+    return snapshot;
   }
 }

@@ -18,10 +18,14 @@ import com.netcafe.platform.domain.entity.session.SessionOrder;
 import com.netcafe.platform.service.finance.RechargeService;
 import com.netcafe.platform.service.account.UserService;
 import com.netcafe.platform.service.session.SessionService;
+import com.netcafe.platform.service.system.AuditLogService;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -48,15 +52,18 @@ public class UserController {
   private final UserService userService;
   private final RechargeService rechargeService;
   private final SessionService sessionService;
+  private final AuditLogService auditLogService;
 
   public UserController(
       UserService userService,
       RechargeService rechargeService,
-      SessionService sessionService
+      SessionService sessionService,
+      AuditLogService auditLogService
   ) {
     this.userService = userService;
     this.rechargeService = rechargeService;
     this.sessionService = sessionService;
+    this.auditLogService = auditLogService;
   }
 
   @GetMapping
@@ -149,15 +156,28 @@ public class UserController {
 
   @PostMapping("/{id}/recharge")
   public ApiResponse<Boolean> recharge(@PathVariable Long id, @Valid @RequestBody UserRechargeRequest request) {
-    requireUser(id);
+    User user = requireUser(id);
     Long operatorAdminId = requireCurrentAdminId();
-    return ApiResponse.success(userService.recharge(
+    RechargeRecord record = userService.recharge(
         id,
         request.getAmount(),
         request.getChannel().trim(),
         StringUtils.hasText(request.getRemark()) ? request.getRemark().trim() : null,
         operatorAdminId
-    ));
+    );
+    if (record == null) {
+      return ApiResponse.success(false);
+    }
+    auditLogService.record(
+        operatorAdminId,
+        resolveCurrentAdminRole(),
+        AuditLogService.ACTION_RECHARGE,
+        "USER",
+        id,
+        null,
+        buildRechargeSnapshot(user, record)
+    );
+    return ApiResponse.success(true);
   }
 
   @GetMapping("/{id}/recharges")
@@ -276,6 +296,33 @@ public class UserController {
     } catch (NumberFormatException ex) {
       throw new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员");
     }
+  }
+
+  private String resolveCurrentAdminRole() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null) {
+      throw new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员");
+    }
+    return authentication.getAuthorities().stream()
+        .map(authority -> authority.getAuthority())
+        .filter(role -> role.startsWith("ROLE_"))
+        .map(role -> role.substring(5))
+        .findFirst()
+        .orElseThrow(() -> new BusinessException(ResultCode.UNAUTHORIZED, "无法识别当前管理员"));
+  }
+
+  private Map<String, Object> buildRechargeSnapshot(User user, RechargeRecord record) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("targetLabel", "用户 " + user.getName());
+    snapshot.put("userName", user.getName());
+    snapshot.put("amount", record.getAmount());
+    snapshot.put("channel", record.getChannel());
+    snapshot.put("remark", record.getRemark());
+    snapshot.put(
+        "changeSummary",
+        "为用户 " + user.getName() + " 充值 " + record.getAmount().setScale(2, RoundingMode.HALF_UP) + " 元，渠道 " + record.getChannel()
+    );
+    return snapshot;
   }
 
   private UserView toView(User user) {

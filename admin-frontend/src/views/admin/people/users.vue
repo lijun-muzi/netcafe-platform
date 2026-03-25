@@ -1,16 +1,19 @@
 <template>
   <section class="page">
-    <AppTopbar title="用户管理" subtitle="注册、余额与状态" eyebrow="用户">
-      <template #actions>
-        <button class="ghost-btn" :disabled="loading" @click="fetchUsers()">刷新列表</button>
-      </template>
-    </AppTopbar>
+    <AppTopbar
+      title="用户管理"
+      subtitle="注册、余额与状态"
+      eyebrow="用户"
+      action-label="刷新列表"
+      :action-disabled="loading"
+      :action-handler="fetchUsers"
+    />
 
     <div v-if="notice.message" class="notice" :class="notice.type === 'error' ? 'notice-error' : 'notice-success'">
       {{ notice.message }}
     </div>
 
-    <div class="card">
+    <div class="card page-card">
       <div class="card-header">
         <div>
           <p class="eyebrow">筛选</p>
@@ -758,3 +761,24 @@ onMounted(() => {
   void fetchUsers()
 })
 </script>
+
+<style scoped>
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+</style>

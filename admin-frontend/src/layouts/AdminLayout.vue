@@ -8,6 +8,9 @@
           <h1>运营控制台</h1>
         </div>
         <div class="hero-actions">
+          <button v-if="toolbarVisible" class="ghost-btn" :disabled="toolbarDisabled" @click="triggerToolbar">
+            {{ toolbarLabel }}
+          </button>
           <button class="ghost-btn">今日班次 09:00 - 18:00</button>
         </div>
       </div>
@@ -20,4 +23,12 @@
 
 <script setup lang="ts">
 import AppSidebar from '../components/AppSidebar.vue'
+import { useAdminToolbarAction } from './adminToolbar'
+
+const {
+  visible: toolbarVisible,
+  label: toolbarLabel,
+  disabled: toolbarDisabled,
+  trigger: triggerToolbar
+} = useAdminToolbarAction()
 </script>

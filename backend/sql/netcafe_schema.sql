@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   UNIQUE KEY `uk_user_mobile` (`mobile`),
   UNIQUE KEY `uk_user_id_card` (`id_card`),
   KEY `idx_user_status` (`status`),
+  KEY `idx_user_status_balance` (`status`, `balance`),
   KEY `idx_user_name_status` (`name`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -44,7 +45,8 @@ CREATE TABLE IF NOT EXISTS `machine` (
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY `uk_machine_code` (`code`),
   KEY `idx_machine_status` (`status`),
-  KEY `idx_machine_price` (`price_per_min`)
+  KEY `idx_machine_price` (`price_per_min`),
+  KEY `idx_machine_template` (`template_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `machine_template` (
@@ -67,11 +69,14 @@ CREATE TABLE IF NOT EXISTS `session_order` (
   `amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   `billed_minutes` INT NOT NULL DEFAULT 0,
   `last_billed_time` DATETIME NULL,
+  `paused_at` DATETIME NULL,
+  `paused_duration_seconds` INT NOT NULL DEFAULT 0,
   `status` TINYINT NOT NULL DEFAULT 0,
   `force_by_admin_id` BIGINT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY `idx_session_status` (`status`),
+  KEY `idx_session_status_start` (`status`, `start_time`),
   KEY `idx_session_start_time` (`start_time`),
   KEY `idx_session_user_start` (`user_id`, `start_time`),
   KEY `idx_session_machine_start` (`machine_id`, `start_time`)
@@ -86,6 +91,7 @@ CREATE TABLE IF NOT EXISTS `recharge_record` (
   `remark` VARCHAR(255) NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY `idx_recharge_user_created` (`user_id`, `created_at`),
+  KEY `idx_recharge_channel_created` (`channel`, `created_at`),
   KEY `idx_recharge_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -100,6 +106,7 @@ CREATE TABLE IF NOT EXISTS `audit_log` (
   `after_data` JSON NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY `idx_audit_created` (`created_at`),
+  KEY `idx_audit_action_created` (`action`, `created_at`),
   KEY `idx_audit_operator` (`operator_id`),
   KEY `idx_audit_target_type` (`target_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
